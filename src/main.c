@@ -13,6 +13,7 @@
 #include "command.h"
 #include "config.h"
 #include "input.h"
+#include "gamecontrollers.h"
 #include "render.h"
 #include "serial.h"
 #include "slip.h"
@@ -23,18 +24,18 @@ enum state run = WAIT_FOR_DEVICE;
 uint8_t need_display_reset = 0;
 
 // Handles CTRL+C / SIGINT
-void intHandler(int dummy) { run = QUIT; }
+void intHandler() { run = QUIT; }
 
 void close_serial_port() { disconnect(); }
 
-int main(int argc, char *argv[]) {
+int main(const int argc, char *argv[]) {
 
-  if(argc == 2 && strcmp(argv[1], "--list") == 0) {
+  if (argc == 2 && SDL_strcmp(argv[1], "--list") == 0) {
     return list_devices();
   }
 
   char *preferred_device = NULL;
-  if (argc == 3 && strcmp(argv[1], "--dev") == 0) {
+  if (argc == 3 && SDL_strcmp(argv[1], "--dev") == 0) {
     preferred_device = argv[2];
     SDL_Log("Using preferred device %s.\n", preferred_device);
   }
@@ -88,7 +89,7 @@ int main(int argc, char *argv[]) {
     run = QUIT;
 
   // initial scan for (existing) game controllers
-  initialize_game_controllers();
+  gamecontrollers_initialize();
 
 #ifdef DEBUG_MSG
   SDL_LogSetAllPriority(SDL_LOG_PRIORITY_DEBUG);
@@ -99,7 +100,7 @@ int main(int argc, char *argv[]) {
     // try to init serial port
     int port_inited = init_serial(1, preferred_device);
     // if port init was successful, try to enable and reset display
-    if (port_inited == 1 && enable_and_reset_display(0) == 1) {
+    if (port_inited == 1 && enable_and_reset_display() == 1) {
       // if audio routing is enabled, try to initialize audio devices
       if (conf.audio_enabled == 1) {
         audio_init(conf.audio_buffer_size, conf.audio_device_name);
@@ -108,8 +109,7 @@ int main(int argc, char *argv[]) {
       }
       run = RUN;
     } else {
-      SDL_LogCritical(SDL_LOG_CATEGORY_ERROR,
-                      "Device not detected on begin loop.");
+      SDL_LogCritical(SDL_LOG_CATEGORY_ERROR, "Device not detected on begin loop.");
       if (conf.wait_for_device == 1) {
         run = WAIT_FOR_DEVICE;
       } else {
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
 
       while (run == WAIT_FOR_DEVICE) {
         // get current input
-        input_msg_s input = get_input_msg(&conf);
+        const input_msg_s input = get_input_msg(&conf);
         if (input.type == special && input.value == msg_quit) {
           SDL_LogCritical(SDL_LOG_CATEGORY_ERROR, "Input message QUIT.");
           run = QUIT;
@@ -141,19 +141,18 @@ int main(int argc, char *argv[]) {
         }
 
         // Poll for M8 device every second
-        if (port_inited == 0 && (SDL_GetTicks() - ticks_poll_device > 1000)) {
+        if (port_inited == 0 && SDL_GetTicks() - ticks_poll_device > 1000) {
           ticks_poll_device = SDL_GetTicks();
           if (run == WAIT_FOR_DEVICE && init_serial(0, preferred_device) == 1) {
 
             if (conf.audio_enabled == 1) {
-              if (audio_init(conf.audio_buffer_size, conf.audio_device_name) ==
-                  0) {
+              if (audio_init(conf.audio_buffer_size, conf.audio_device_name) == 0) {
                 SDL_Log("Cannot initialize audio");
                 conf.audio_enabled = 0;
               }
             }
 
-            int result = enable_and_reset_display();
+            const int result = enable_and_reset_display();
             // Device was found; enable display and proceed to the main loop
             if (result == 1) {
               run = RUN;
@@ -174,7 +173,7 @@ int main(int argc, char *argv[]) {
         if (conf.audio_enabled == 1) {
           audio_destroy();
         }
-        close_game_controllers();
+        gamecontrollers_close();
         close_renderer();
         kill_inline_font();
         SDL_free(serial_buf);
@@ -187,7 +186,7 @@ int main(int argc, char *argv[]) {
     while (run == RUN) {
 
       // get current inputs
-      input_msg_s input = get_input_msg(&conf);
+      const input_msg_s input = get_input_msg(&conf);
 
       switch (input.type) {
       case normal:
@@ -218,6 +217,9 @@ int main(int argc, char *argv[]) {
           case msg_reset_display:
             reset_display();
             break;
+          case msg_toggle_audio:
+            toggle_audio(conf.audio_buffer_size, conf.audio_device_name);
+            break;
           default:
             break;
           }
@@ -227,21 +229,21 @@ int main(int argc, char *argv[]) {
 
       while (1) {
         // read serial port
-        int bytes_read = serial_read(serial_buf, serial_read_size);
+        const int bytes_read = serial_read(serial_buf, serial_read_size);
         if (bytes_read < 0) {
-          SDL_LogCritical(SDL_LOG_CATEGORY_ERROR, "Error %d reading serial. \n",
-                          (int)bytes_read);
+          SDL_LogCritical(SDL_LOG_CATEGORY_ERROR, "Error %d reading serial.", bytes_read);
           run = QUIT;
           break;
-        } else if (bytes_read > 0) {
+        }
+        if (bytes_read > 0) {
           // input from device: reset the zero byte counter and create a
           // pointer to the serial buffer
           zerobyte_packets = 0;
-          uint8_t *cur = serial_buf;
+          const uint8_t *cur = serial_buf;
           const uint8_t *end = serial_buf + bytes_read;
           while (cur < end) {
             // process the incoming bytes into commands and draw them
-            int n = slip_read_byte(&slip, *(cur++));
+            const int n = slip_read_byte(&slip, *cur++);
             if (n != SLIP_NO_ERROR) {
               if (n == SLIP_ERROR_INVALID_PACKET) {
                 reset_display();
@@ -260,17 +262,16 @@ int main(int argc, char *argv[]) {
             if (check_serial_port()) {
               // the device is still there, carry on
               break;
-            } else {
-              port_inited = 0;
-              run = WAIT_FOR_DEVICE;
-              close_serial_port();
-              if (conf.audio_enabled == 1) {
-                audio_destroy();
-              }
-              /* we'll make one more loop to see if the device is still there
-               * but just sending zero bytes. if it doesn't get detected when
-               * resetting the port, it will disconnect */
             }
+            port_inited = 0;
+            run = WAIT_FOR_DEVICE;
+            close_serial_port();
+            if (conf.audio_enabled == 1) {
+              audio_destroy();
+            }
+            /* we'll make one more loop to see if the device is still there
+             * but just sending zero bytes. if it doesn't get detected when
+             * resetting the port, it will disconnect */
           }
           break;
         }
@@ -286,11 +287,10 @@ int main(int argc, char *argv[]) {
   if (conf.audio_enabled == 1) {
     audio_destroy();
   }
-  close_game_controllers();
+  gamecontrollers_close();
   close_renderer();
   close_serial_port();
   SDL_free(serial_buf);
-  kill_inline_font();
   SDL_Quit();
   return 0;
 }

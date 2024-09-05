@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.15)
 
 project(m8c LANGUAGES C)
 
+set(CMAKE_C_FLAGS "-O2 -Wall -Wextra")
+
 set(APP_NAME m8c)
 
 find_package(PkgConfig REQUIRED)
@@ -44,16 +46,21 @@ if (APPLE)
             )
 
     set_target_properties(${APP_NAME} PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/package/macos/m8c.app/Contents/Info.plist"
             MACOSX_BUNDLE_BUNDLE_NAME "m8c"
             MACOSX_BUNDLE_BUNDLE_VERSION "1"
-            MACOSX_BUNDLE_GUI_IDENTIFIER "com.laamaa.m8c"
-            MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
             MACOSX_BUNDLE_COPYRIGHT "Copyright © 2021 laamaa. All rights reserved."
+            MACOSX_BUNDLE_GUI_IDENTIFIER "fi.laamaa.m8c"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "1.7.8"
             MACOSX_BUNDLE_ICON_FILE "m8c.icns")
 
     set(APPS "\${CMAKE_INSTALL_PREFIX}/${APP_NAME}.app")
 
     install(CODE "include(BundleUtilities)
-    fixup_bundle(\"${APPS}\" \"\" \"\")")
+    fixup_bundle(\"${APPS}\" \"\" \"\")
+    execute_process(COMMAND codesign --force --deep --sign - \${CMAKE_INSTALL_PREFIX}/${APP_NAME}.app)")
+    set(CPACK_GENERATOR "DragNDrop")
+    include(CPack)
 endif ()
 

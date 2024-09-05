@@ -6,7 +6,7 @@ The [Dirtywave M8 Tracker](https://dirtywave.com/products/m8-tracker) is a porta
 
 While Dirtywave makes new batches of units available on a regular basis, M8 is sometimes sold out due to the worldwide chip shortage and high demand of the unit. To fill this gap and and to allow users to freely test this wonderful tracker, [Timothy Lamb](https://github.com/trash80) was kind enough to make the [M8 Headless](https://github.com/Dirtywave/M8HeadlessFirmware) available to everyone.
 
-If you like the M8 and you gel with the tracker workflow, please support [Dirtywave](https://dirtywave.com/) by purchasing the actual unit. You can check its availability [here](https://dirtywave.com/products/m8-tracker). Meanwhile, you can also subscribe to Timothy Lamb's [Patreon](https://www.patreon.com/trash80).
+If you like the M8 and you gel with the tracker workflow, please support [Dirtywave](https://dirtywave.com/) by purchasing the actual unit. You can check its availability [here](https://dirtywave.com/products/m8-tracker-model-02). Meanwhile, you can also subscribe to Timothy Lamb's [Patreon](https://www.patreon.com/trash80).
 
 *m8c* is a client for Dirtywave M8 tracker's headless mode. The application should be cross-platform ready and can be built in Linux, Windows (with MSYS2/MINGW64) and Mac OS.
 
@@ -28,6 +28,8 @@ Disclaimer: I'm not a coder and hardly understand C, use at your own risk :)
 
 There are prebuilt binaries available in the [releases section](https://github.com/laamaa/m8c/releases/) for Windows and recent versions of MacOS.
 
+When running the program for the first time on MacOS, it may not open as it is from an Unidentified Developer. You need to open it from the Applications Folder via Control+Click > Open then select Open from the popup menu.
+
 ### Linux
 
 There are packages available for Fedora Linux and NixOS, or you can build the program from source.
@@ -41,6 +43,12 @@ sudo dnf install m8c
 #### NixOS
 ``` sh
 nix-env -iA m8c-stable -f https://github.com/laamaa/m8c/archive/refs/heads/main.tar.gz
+```
+
+Or if you're using flakes and the nix command, you can run the app directly with:
+
+```sh
+nix run github:laamaa/m8c
 ```
 
 ### Building from source code
@@ -106,7 +114,7 @@ And you can specify the preferred device by using
 
 ## Keyboard mappings
 
-Keys for controlling the progam:
+Default keys for controlling the progam:
 
 * Up arrow = up
 * Down arrow = down
@@ -123,6 +131,7 @@ Additional controls:
 * Delete = opt+edit (deletes a row)
 * Esc = toggle keyjazz on/off 
 * r / select+start+opt+edit = reset display (if glitches appear on the screen, use this)
+* F12 = toggle audio routing on / off
 
 ### Keyjazz
 Keyjazz allows to enter notes with keyboard, oldschool tracker-style. The layout is two octaves, starting from keys Z and Q.
@@ -140,18 +149,22 @@ The program uses SDL's game controller system, which should make it work automag
 ## Audio
 
 Experimental audio routing support can be enabled by setting the config value `"audio_enabled"` to `"true"`. The audio buffer size can also be tweaked from the config file for possible lower latencies.
-If the right audio device is not picked up by default, you can use a specific audio device by using `"audio_output_device"` config parameter.
+If the right audio device is not picked up by default, you can use a specific audio device by using `"audio_device_name"` config parameter.
+
+It is possible to toggle audio routing on/off with a key defined in the config (`"key_toggle_audio"`). The default key is F12.
+
+On MacOS you need to grant the program permission to access the Microphone for audio routing to work.
 
 ## Config
 
 Application settings and keyboard/game controller bindings can be configured via `config.ini`.
 
-If not found, the file will be created in one of these locations:
+The keyboard configuration uses SDL2 Scancodes, a reference list can be found at https://wiki.libsdl.org/SDL2/SDLScancodeLookup
+
+If the file does not exist, it will be created in one of these locations:
 * Windows: `C:\Users\<username>\AppData\Roaming\m8c\config.ini`
 * Linux: `/home/<username>/.local/share/m8c/config.ini`
 * MacOS: `/Users/<username>/Library/Application Support/m8c/config.ini`
-
-See the `config.ini.sample` file to see the available options.
 
 Enjoy making some nice music!
 
